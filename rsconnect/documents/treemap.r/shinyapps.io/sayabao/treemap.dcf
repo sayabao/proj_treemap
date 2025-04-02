@@ -5,6 +5,6 @@ account: sayabao
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 14403938
-bundleId: 10042020
+bundleId: 10042264
 url: https://sayabao.shinyapps.io/treemap/
 version: 1

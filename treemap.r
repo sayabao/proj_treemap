@@ -5,7 +5,23 @@ library(jsonlite)
 ui <- fluidPage(
   tags$head(
     tags$style(HTML("
-      #map { height: 600px; width: 100%; }
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
+      }
+      #map { 
+        height: 90vh;   /* 使用视窗高度的90% */
+        width: 90vw;    /* 使用视窗宽度的90% */
+        margin: auto;   /* 自动外边距确保居中 */
+      }
       .tree-form { padding: 10px; }
       .tree-form input { margin: 5px 0; width: 100%; }
       .tree-info { padding: 10px; }
@@ -23,7 +39,9 @@ ui <- fluidPage(
     "))
   ),
   
-  leafletOutput("map"),
+  div(id = "map-container",
+      leafletOutput("map")
+  ),
   
   absolutePanel(
     class = "control-panel",
@@ -102,7 +120,7 @@ server <- function(input, output, session) {
   output$map <- renderLeaflet({
     leaflet() %>%
       addTiles() %>%
-      setView(lng = 113.2943, lat = 23.0965, zoom = 19) %>%
+      setView(lng = 113.2943, lat = 23.0965, zoom = 17) %>%  # 调整zoom级别为17
       htmlwidgets::onRender("
         function(el, x) {
           // 将地图对象赋值给全局变量
