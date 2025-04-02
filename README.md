@@ -1,6 +1,10 @@
 # 简要说明
 
-将原本基于无穷JSON的系统迁移至RShiny实现，当前功能包括：
+将原本基于无穷JSON的系统迁移至RShiny实现
+
+地址：https://sayabao.shinyapps.io/treemap/
+
+当前功能包括：
 
 1. **数据读取**
    - 自动读取工作目录下的`treedata.json`文件
