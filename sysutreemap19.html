@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>中山大学南校园树木地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 600px; width: 100%; }
+        .tree-form { padding: 10px; }
+        .tree-form input { margin: 5px 0; width: 100%; }
+        .tree-info { padding: 10px; }
+        .control-panel { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            background: white; 
+            padding: 10px; 
+            z-index: 1000; 
+            border: 1px solid #ccc; 
+            border-radius: 4px;
+        }
+        .control-panel button, .control-panel input { margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="control-panel">
+        <div>点击地图添加树并编辑资料</div>
+        <button onclick="exportTreeData()">导出树数据</button><br>
+        <input type="file" id="loadFile" accept=".json" onchange="loadTreeData(event)">
+        <label for="loadFile">加载树数据</label>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 初始化地图，中心设为中山大学南校园，缩放级别设为 19
+        var map = L.map('map', {
+            center: [23.0965, 113.2943],
+            zoom: 19,
+            layers: []
+        });
+
+        // 定义地图图层
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        });
+
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '© Esri & OpenStreetMap contributors',
+            maxZoom: 19
+        });
+
+        // 默认加载 OSM 图层
+        osmLayer.addTo(map);
+
+        // 图层控制
+        var baseLayers = {
+            "街道地图": osmLayer,
+            "卫星图": satelliteLayer
+        };
+        L.control.layers(baseLayers).addTo(map);
+
+        // 自定义绿色小圆点标记
+        var greenDotIcon = L.divIcon({
+            className: 'custom-dot',
+            html: '<div style="background-color: green; width: 8px; height: 8px; border-radius: 50%;"></div>',
+            iconSize: [8, 8],
+            iconAnchor: [4, 4]
+        });
+
+        // 存储所有标记
+        var markers = {};
+        var markerIdCounter = 0;
+
+        // 保存树数据的函数
+        function saveTreeData(marker) {
+            var species = document.getElementById('species-' + marker.id).value;
+            marker.treeData.species = species;
+            marker.setPopupContent(getTreeInfoContent(marker));
+            marker.closePopup();
+            marker.openPopup();
+        }
+
+        // 删除树标记的函数
+        function deleteTree(marker) {
+            map.removeLayer(marker);
+            delete markers[marker.id];
+            delete window[marker.id];
+        }
+
+        // 获取树信息的显示内容
+        function getTreeInfoContent(marker) {
+            return `
+                <div class="tree-info">
+                    <b>树信息</b><br>
+                    树种: ${marker.treeData.species || '未指定'}<br>
+                    坐标: ${marker.treeData.lat}, ${marker.treeData.lng}<br>
+                    <button onclick="editTree(window['${marker.id}'])">编辑</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+        }
+
+        // 编辑树信息的函数
+        function editTree(marker) {
+            var popupContent = `
+                <div class="tree-form">
+                    <label>树种: <input type="text" id="species-${marker.id}" value="${marker.treeData.species}"></label><br>
+                    <button onclick="saveTreeData(window['${marker.id}'])">保存</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+            marker.setPopupContent(popupContent);
+            marker.openPopup();
+        }
+
+        // 点击添加树标记并编辑资料
+        map.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            var marker = L.marker([lat, lng], { icon: greenDotIcon }).addTo(map);
+            
+            marker.id = 'marker-' + markerIdCounter++;
+            marker.treeData = {
+                species: '',
+                lat: lat.toFixed(6),
+                lng: lng.toFixed(6)
+            };
+
+            markers[marker.id] = marker;
+            window[marker.id] = marker;
+
+            var popupContent = `
+                <div class="tree-form">
+                    <label>树种: <input type="text" id="species-${marker.id}" value="${marker.treeData.species}"></label><br>
+                    <button onclick="saveTreeData(window['${marker.id}'])">保存</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent).openPopup();
+        });
+
+        // 导出树数据的函数
+        function exportTreeData() {
+            var treeDataArray = Object.values(markers).map(marker => marker.treeData);
+            var json = JSON.stringify(treeDataArray, null, 2);
+            var blob = new Blob([json], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'tree_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 加载树数据的函数
+        function loadTreeData(event) {
+    var file = event.target.files[0];
+    if (!file) {
+        console.log("没有选择文件");
+        return;
+    }
+    
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var treeDataArray = JSON.parse(e.target.result);
+            console.log("加载的树数据:", treeDataArray); // 调试信息
+            
+            if (!Array.isArray(treeDataArray)) {
+                console.error("数据格式错误: 应该是一个数组");
+                return;
+            }
+            
+            treeDataArray.forEach(function(treeData) {
+                try {
+                    var lat = parseFloat(treeData.lat);
+                    var lng = parseFloat(treeData.lng);
+                    
+                    if (isNaN(lat) || isNaN(lng)) {
+                        console.error("无效的坐标值:", treeData);
+                        return;
+                    }
+                    
+                    console.log("添加标记:", lat, lng); // 调试信息
+                    
+                    var marker = L.marker([lat, lng], { icon: greenDotIcon }).addTo(map);
+                    marker.id = 'marker-' + markerIdCounter++;
+                    marker.treeData = {
+                        species: treeData.species || '',
+                        lat: treeData.lat,
+                        lng: treeData.lng
+                    };
+                    markers[marker.id] = marker;
+                    window[marker.id] = marker;
+                    marker.bindPopup(getTreeInfoContent(marker));
+                } catch (error) {
+                    console.error("处理单个树数据时出错:", treeData, error);
+                }
+            });
+        } catch (error) {
+            console.error("解析JSON时出错:", error);
+            alert("文件格式错误，请检查JSON文件");
+        }
+    };
+    reader.onerror = function() {
+        console.error("读取文件时出错");
+        alert("读取文件时出错");
+    };
+    reader.readAsText(file);
+}
+    </script>
+</body>
+</html>
