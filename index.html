@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>中山大学南校园树木地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <style>
+        :root {
+            --primary-color: #2e7d32;
+            --secondary-color: #1b5e20;
+            --accent-color: #ff8f00;
+            --light-bg: #f5f5f5;
+            --dark-text: #333;
+            --light-text: #f5f5f5;
+            --card-bg: #ffffff;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --border-color: #e0e0e0;
+            --input-bg: #ffffff;
+            --input-border: #cccccc;
+            --button-primary-bg: var(--primary-color);
+            --button-primary-text: white;
+            --button-primary-hover-bg: var(--secondary-color);
+            --button-secondary-bg: var(--accent-color);
+            --button-secondary-text: white;
+            --button-secondary-hover-bg: #e68100;
+            --button-danger-bg: #d32f2f;
+            --button-danger-hover-bg: #b71c1c;
+            --marker-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--dark-text);
+        }
+
+        #map-container {
+            width: 1200px;
+            height: 800px;
+            position: relative;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            background: var(--card-bg);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+        }
+
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--card-bg);
+            padding: 10px; /* Reduced padding */
+            z-index: 1000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px; /* Reduced border radius */
+            width: 250px; /* Reduced width */
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Reduced gap */
+            font-size: 0.85rem; /* Reduced font size */
+        }
+
+        .control-panel:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-header {
+            font-size: 1rem; /* Reduced font size */
+            font-weight: 500; /* Reduced font weight */
+            color: var(--primary-color);
+            margin-bottom: 6px; /* Reduced margin */
+            padding-bottom: 6px; /* Reduced padding */
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px; /* Reduced gap */
+        }
+
+        .form-group label {
+            font-weight: 400; /* Reduced font weight */
+            font-size: 0.75rem; /* Reduced font size */
+            color: var(--dark-text);
+        }
+
+        .form-control {
+            border-radius: 4px; /* Reduced border radius */
+            padding: 6px 8px; /* Reduced padding */
+            border: 1px solid var(--input-border);
+            background-color: var(--input-bg);
+            font-size: 0.8rem; /* Reduced font size */
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(46, 125, 50, 0.25);
+            outline: none;
+        }
+
+        .btn-custom {
+            background-color: var(--button-primary-bg);
+            color: var(--button-primary-text);
+            border: none;
+            border-radius: 4px; /* Reduced border radius */
+            padding: 6px 10px; /* Reduced padding */
+            cursor: pointer;
+            font-size: 0.8rem; /* Reduced font size */
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+            text-align: center;
+            display: inline-block;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 4px 0; /* Reduced margin */
+        }
+
+        .btn-custom:hover {
+            background-color: var(--button-primary-hover-bg);
+            transform: translateY(-1px);
+        }
+
+        .btn-custom-secondary {
+            background-color: var(--button-secondary-bg);
+            color: var(--button-secondary-text);
+        }
+
+        .btn-custom-secondary:hover {
+            background-color: var(--button-secondary-hover-bg);
+        }
+
+        #loadFile {
+            display: none; /* Hide the default file input */
+        }
+
+        label[for="loadFile"] {
+            display: inline-block;
+            background-color: var(--button-secondary-bg);
+            color: var(--button-secondary-text);
+            border-radius: 4px; /* Reduced border radius */
+            padding: 6px 10px; /* Reduced padding */
+            cursor: pointer;
+            font-size: 0.8rem; /* Reduced font size */
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        label[for="loadFile"]:hover {
+             background-color: var(--button-secondary-hover-bg);
+             transform: translateY(-1px);
+        }
+
+
+        #searchResults {
+            max-height: 120px; /* Adjusted height */
+            overflow-y: auto;
+            margin-top: 8px; /* Reduced margin */
+            border-radius: 4px; /* Reduced border radius */
+            background: var(--card-bg);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        #searchResults table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #searchResults th {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 6px; /* Reduced padding */
+            position: sticky;
+            top: 0;
+            text-align: left;
+            font-size: 0.7rem; /* Reduced font size */
+        }
+
+        #searchResults td {
+            padding: 6px; /* Reduced padding */
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+            font-size: 0.7rem; /* Reduced font size */
+        }
+
+        #searchResults tr:last-child td {
+            border-bottom: none;
+        }
+
+        #searchResults tr:hover td {
+            background-color: rgba(46, 125, 50, 0.1);
+            cursor: pointer;
+        }
+
+        .tree-info {
+            padding: 20px; /* Increased padding */
+            border-radius: 8px;
+            background: var(--card-bg);
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* Added gap */
+        }
+
+        .tree-info h4 {
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 10px;
+            padding-bottom: 10px; /* Increased padding */
+            border-bottom: 1px solid var(--border-color);
+            font-size: 1.2rem; /* Increased font size */
+            font-weight: 700;
+        }
+
+        .tree-info p {
+            margin: 0; /* Remove default paragraph margin */
+            font-size: 1rem;
+        }
+
+        .tree-info .button-group {
+            display: flex;
+            gap: 10px; /* Added gap between buttons */
+            margin-top: 15px; /* Increased top margin */
+        }
+
+        .tree-info .btn {
+            flex-grow: 1; /* Allow buttons to grow */
+            text-align: center;
+            padding: 10px 15px; /* Increased padding */
+            border-radius: 6px; /* Increased border radius */
+            cursor: pointer;
+            font-size: 1rem; /* Increased font size */
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            border: none;
+            color: white;
+        }
+
+        .tree-info .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .tree-info .btn:first-of-type {
+            background-color: var(--primary-color);
+        }
+
+        .tree-info .btn:first-of-type:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .tree-info .btn:nth-of-type(2) {
+             background-color: var(--accent-color);
+        }
+
+        .tree-info .btn:nth-of-type(2):hover {
+             background-color: var(--button-secondary-hover-bg);
+        }
+
+
+        .tree-info .btn:last-of-type {
+            background-color: var(--button-danger-bg); /* Red for delete */
+        }
+
+        .tree-info .btn:last-of-type:hover {
+            background-color: var(--button-danger-hover-bg);
+        }
+
+
+        .tree-form {
+             padding: 20px; /* Increased padding */
+             border-radius: 8px;
+             background: var(--card-bg);
+             box-shadow: var(--card-shadow);
+             border: 1px solid var(--border-color);
+             display: flex;
+             flex-direction: column;
+             gap: 15px; /* Added gap */
+        }
+
+        .tree-form label {
+            display: block;
+            margin-bottom: 5px; /* Adjusted margin */
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--dark-text);
+        }
+
+        .tree-form input[type="text"],
+        .tree-form textarea {
+            width: 100%;
+            padding: 10px 12px; /* Increased padding */
+            margin-top: 4px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px; /* Increased border radius */
+            box-sizing: border-box;
+            font-size: 1rem; /* Increased font size */
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+         .tree-form input[type="text"]:focus,
+         .tree-form textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(46, 125, 50, 0.25);
+            outline: none;
+        }
+
+        .tree-form textarea {
+            min-height: 80px; /* Added min-height */
+            resize: vertical; /* Allow vertical resize */
+        }
+
+
+        .tree-form .button-group {
+            display: flex;
+            gap: 10px; /* Added gap between buttons */
+            margin-top: 15px; /* Increased top margin */
+        }
+
+        .tree-form button {
+            flex-grow: 1; /* Allow buttons to grow */
+            text-align: center;
+            padding: 10px 15px; /* Increased padding */
+            border-radius: 6px; /* Increased border radius */
+            cursor: pointer;
+            font-size: 1rem; /* Increased font size */
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            border: none;
+            color: white;
+        }
+
+        .tree-form button:hover {
+            transform: translateY(-1px);
+        }
+
+        .tree-form button:first-of-type {
+            background-color: var(--primary-color);
+        }
+
+        .tree-form button:first-of-type:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .tree-form button:last-of-type {
+            background-color: var(--button-danger-bg); /* Red for delete */
+        }
+
+        .tree-form button:last-of-type:hover {
+            background-color: var(--button-danger-hover-bg);
+        }
+
+
+        .custom-dot {
+            background-color: #2e7d32; /* Primary color */
+            width: 12px; /* Increased size */
+            height: 12px; /* Increased size */
+            border-radius: 50%;
+            box-shadow: var(--marker-shadow); /* Added shadow */
+        }
+
+        .custom-cluster-icon {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: var(--marker-shadow); /* Added shadow */
+            /* Adjusted sizes for better visual hierarchy */
+            font-size: 0.9rem; /* Reduced font size */
+        }
+
+        .leaflet-popup-content {
+            margin: 10px;
+            min-width: 280px; /* Increased min-width */
+            font-size: 0.9rem;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .leaflet-popup-tip {
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="map-container">
+        <div id="map"></div>
+        <div class="control-panel">
+            <div>右键点击地图添加树并编辑资料</div>
+            <button onclick="exportTreeData()">导出树数据</button><br>
+            <input type="file" id="loadFile" accept=".json" onchange="loadTreeData(event)">
+            <label for="loadFile">加载树数据</label><br>
+            <input type="text" id="searchInput" placeholder="搜索树种或备注..." onkeyup="searchTrees()">
+            <div id="searchResults"></div>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script>
+        // 初始化地图，中心设为中山大学南校园，缩放级别设为 19
+        var map = L.map('map', {
+            center: [23.0965, 113.2943],
+            zoom: 19,
+            layers: []
+        });
+
+        // 定义地图图层
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        });
+
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '© Esri & OpenStreetMap contributors',
+            maxZoom: 19
+        });
+
+        // 默认加载 OSM 图层
+        osmLayer.addTo(map);
+
+        // 图层控制
+        var baseLayers = {
+            "街道地图": osmLayer,
+            "卫星图": satelliteLayer
+        };
+        L.control.layers(baseLayers).addTo(map);
+
+        // 自定义绿色小圆点标记
+        var greenDotIcon = L.divIcon({
+            className: 'custom-dot',
+            html: '<div style="background-color: green; width: 8px; height: 8px; border-radius: 50%;"></div>',
+            iconSize: [8, 8],
+            iconAnchor: [4, 4]
+        });
+
+        // 初始化标记聚类组
+        var markersCluster = L.markerClusterGroup({
+            maxClusterRadius: 40,           // 缩小聚类半径（默认40），使聚类更密集
+            spiderfyOnMaxZoom: true,        // 在最大缩放层级时展开聚类
+            showCoverageOnHover: false,     // 禁用悬停显示范围（提升性能）
+            zoomToBoundsOnClick: true,      // 点击聚类时自动缩放到范围
+            disableClusteringAtZoom: 20,    // 在缩放层级≥18时禁用聚类（显示全部标记）
+            
+            // 自定义聚类图标样式
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                let size = 'small';
+                if (count > 100) size = 'large';
+                else if (count > 10) size = 'medium';
+                
+                return L.divIcon({
+                    html: `<div style="background: #4CAF50; color: white; border-radius: 50%; 
+                           width: ${size === 'large' ? '40px' : size === 'medium' ? '30px' : '20px'}; 
+                           height: ${size === 'large' ? '40px' : size === 'medium' ? '30px' : '20px'};
+                           line-height: ${size === 'large' ? '40px' : size === 'medium' ? '30px' : '20px'};
+                           text-align: center; font-weight: bold;">
+                          ${count}</div>`,
+                    className: 'custom-cluster-icon',
+                    iconSize: L.point(40, 40)
+                });
+            }
+        });
+        
+        // 将聚类组添加到地图
+        map.addLayer(markersCluster);
+
+        // 存储所有标记
+        var markers = {};
+        var markerIdCounter = 0;
+
+        // 页面加载时自动加载默认数据
+        window.onload = function() {
+            loadDefaultData();
+            // 确保地图正确调整大小
+            setTimeout(function() {
+                map.invalidateSize();
+            }, 100);
+        };
+
+        // 窗口大小改变时重新调整地图大小
+        window.addEventListener('resize', function() {
+            map.invalidateSize();
+        });
+
+        // 加载默认数据的函数
+        function loadDefaultData() {
+            fetch('yrx_data.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('默认数据文件不存在或无法读取');
+                    }
+                    return response.json();
+                })
+                .then(treeDataArray => {
+                    treeDataArray.forEach(function(treeData) {
+                        addMarkerFromData(treeData);
+                    });
+                    searchTrees();
+                })
+                .catch(error => {
+                    console.log('加载默认数据时出错:', error.message);
+                    // 可以在这里添加用户友好的提示
+                });
+        }
+
+        // 从数据添加标记的辅助函数
+        function addMarkerFromData(treeData) {
+            var marker = L.marker([parseFloat(treeData.lat), parseFloat(treeData.lng)], { icon: greenDotIcon, draggable: false });
+            marker.id = 'marker-' + markerIdCounter;
+            marker.treeData = {
+                id: markerIdCounter++,
+                species: treeData.species || '',
+                notes: treeData.notes || '',
+                lat: treeData.lat,
+                lng: treeData.lng
+            };
+            markers[marker.id] = marker;
+            window[marker.id] = marker;
+            marker.bindPopup(getTreeInfoContent(marker));
+            markersCluster.addLayer(marker);
+        }
+
+        // 保存树数据的函数
+        function saveTreeData(marker) {
+            var species = document.getElementById('species-' + marker.id).value;
+            var notes = document.getElementById('notes-' + marker.id).value;
+            marker.treeData.species = species;
+            marker.treeData.notes = notes;
+            marker.setPopupContent(getTreeInfoContent(marker));
+            marker.closePopup();
+            marker.openPopup();
+        }
+
+        // 删除树标记的函数
+        function deleteTree(marker) {
+            markersCluster.removeLayer(marker);
+            delete markers[marker.id];
+            delete window[marker.id];
+            searchTrees();
+        }
+
+        // 调整位置的函数
+        function adjustPosition(marker) {
+            marker.dragging.enable();
+            marker.on('dragend', function(e) {
+                var newLatLng = marker.getLatLng();
+                marker.treeData.lat = newLatLng.lat.toFixed(6);
+                marker.treeData.lng = newLatLng.lng.toFixed(6);
+                marker.dragging.disable();
+                marker.setPopupContent(getTreeInfoContent(marker));
+                marker.openPopup();
+                searchTrees();
+            });
+            marker.closePopup();
+        }
+
+        // 获取树信息的显示内容
+        function getTreeInfoContent(marker) {
+            return `
+                <div class="tree-info">
+                    <b>树信息</b><br>
+                    编号: ${marker.treeData.id}<br>
+                    树种: ${marker.treeData.species || '未指定'}<br>
+                    备注: ${marker.treeData.notes || '无'}<br>
+                    坐标: ${marker.treeData.lat}, ${marker.treeData.lng}<br>
+                    <button onclick="editTree(window['${marker.id}'])">编辑</button>
+                    <button onclick="adjustPosition(window['${marker.id}'])">调整位置</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+        }
+
+        // 编辑树信息的函数
+        function editTree(marker) {
+            var popupContent = `
+                <div class="tree-form">
+                    <label>树种: <input type="text" id="species-${marker.id}" value="${marker.treeData.species}"></label><br>
+                    <label>备注: <textarea id="notes-${marker.id}">${marker.treeData.notes || ''}</textarea></label><br>
+                    <button onclick="saveTreeData(window['${marker.id}'])">保存</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+            marker.setPopupContent(popupContent);
+            marker.openPopup();
+        }
+
+        // 右键点击添加树标记
+        map.on('contextmenu', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            var marker = L.marker([lat, lng], { icon: greenDotIcon, draggable: false });
+            
+            marker.id = 'marker-' + markerIdCounter;
+            marker.treeData = {
+                id: markerIdCounter++,
+                species: '',
+                notes: '',
+                lat: lat.toFixed(6),
+                lng: lng.toFixed(6)
+            };
+
+            markers[marker.id] = marker;
+            window[marker.id] = marker;
+
+            var popupContent = `
+                <div class="tree-form">
+                    <label>树种: <input type="text" id="species-${marker.id}" value="${marker.treeData.species}"></label><br>
+                    <label>备注: <textarea id="notes-${marker.id}">${marker.treeData.notes || ''}</textarea></label><br>
+                    <button onclick="saveTreeData(window['${marker.id}'])">保存</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent).openPopup();
+            markersCluster.addLayer(marker);
+            searchTrees();
+        });
+
+        // 导出树数据的函数
+        function exportTreeData() {
+            var treeDataArray = Object.values(markers).map(marker => marker.treeData);
+            var json = JSON.stringify(treeDataArray, null, 2);
+            var blob = new Blob([json], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'tree_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 加载树数据的函数
+        function loadTreeData(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var treeDataArray = JSON.parse(e.target.result);
+                // 清除现有标记
+                markersCluster.clearLayers();
+                markers = {};
+                markerIdCounter = 0;
+                
+                treeDataArray.forEach(function(treeData) {
+                    addMarkerFromData(treeData);
+                });
+                searchTrees();
+            };
+            reader.readAsText(file);
+        }
+
+        // 搜索树木的函数（支持树种和备注）
+        function searchTrees() {
+            var query = document.getElementById('searchInput').value.toLowerCase();
+            var results = Object.values(markers).filter(marker => 
+                (marker.treeData.species.toLowerCase().includes(query) || 
+                 (marker.treeData.notes && marker.treeData.notes.toLowerCase().includes(query)))
+            );
+            var table = '<table><thead><tr><th>编号</th><th>树种</th><th>坐标</th></tr></thead><tbody>';
+            results.forEach(marker => {
+                table += `
+                    <tr onclick="focusTree('${marker.id}')">
+                        <td>${marker.treeData.id}</td>
+                        <td>${marker.treeData.species || '未指定'}</td>
+                        <td>${marker.treeData.lat}, ${marker.treeData.lng}</td>
+                    </tr>
+                `;
+            });
+            table += '</tbody></table>';
+            document.getElementById('searchResults').innerHTML = table;
+        }
+
+        // 定位到树木的函数
+        function focusTree(markerId) {
+            var marker = markers[markerId];
+            if (marker) {
+                map.setView([parseFloat(marker.treeData.lat), parseFloat(marker.treeData.lng)], 19);
+                marker.openPopup();
+            }
+        }
+    </script>
+</body>
+</html>

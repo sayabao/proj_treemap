@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>中山大学南校园树木地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <style>
+        body {
+    margin: 0;
+    padding: 0;
+    height: 100vh; /* 确保 body 高度占满整个视口 */
+    display: flex;
+    justify-content: center; /* 水平居中 */
+    align-items: center;     /* 垂直居中 */
+}
+        #map-container {
+            width: 1200px;
+            height: 800px;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+         #map { 
+            width: 100%;
+            height: 100%;
+        }
+        .tree-form { padding: 10px; }
+        .tree-form input, .tree-form textarea { margin: 5px 0; width: 100%; }
+        .tree-info { padding: 10px; }
+        .control-panel { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            background: white; 
+            padding: 10px; 
+            z-index: 1000; 
+            border: 1px solid #ccc; 
+            border-radius: 4px;
+            width: 300px;
+        }
+        .control-panel button, .control-panel input { margin-top: 5px; }
+        #searchResults { max-height: 200px; overflow-y: auto; margin-top: 10px; }
+        #searchResults table { width: 100%; border-collapse: collapse; }
+        #searchResults th, #searchResults td { border: 1px solid #ccc; padding: 5px; }
+        #searchResults th { background-color: #f2f2f2; }
+        #searchResults td:hover { background-color: #e0e0e0; cursor: pointer; }
+        
+        /* Custom cluster icon styles */
+        .custom-cluster-icon {
+            background: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="map-container">
+        <div id="map"></div>
+        <div class="control-panel">
+            <div>右键点击地图添加树并编辑资料</div>
+            <button onclick="exportTreeData()">导出树数据</button><br>
+            <input type="file" id="loadFile" accept=".json" onchange="loadTreeData(event)">
+            <label for="loadFile">加载树数据</label><br>
+            <input type="text" id="searchInput" placeholder="搜索树种或备注..." onkeyup="searchTrees()">
+            <div id="searchResults"></div>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script>
+        // 初始化地图，中心设为中山大学南校园，缩放级别设为 19
+        var map = L.map('map', {
+            center: [23.0965, 113.2943],
+            zoom: 19,
+            layers: []
+        });
+
+        // 定义地图图层
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        });
+
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '© Esri & OpenStreetMap contributors',
+            maxZoom: 19
+        });
+
+        // 默认加载 OSM 图层
+        osmLayer.addTo(map);
+
+        // 图层控制
+        var baseLayers = {
+            "街道地图": osmLayer,
+            "卫星图": satelliteLayer
+        };
+        L.control.layers(baseLayers).addTo(map);
+
+        // 自定义绿色小圆点标记
+        var greenDotIcon = L.divIcon({
+            className: 'custom-dot',
+            html: '<div style="background-color: green; width: 8px; height: 8px; border-radius: 50%;"></div>',
+            iconSize: [8, 8],
+            iconAnchor: [4, 4]
+        });
+
+        // 初始化标记聚类组
+        var markersCluster = L.markerClusterGroup({
+            maxClusterRadius: 40,           // 缩小聚类半径（默认40），使聚类更密集
+            spiderfyOnMaxZoom: true,        // 在最大缩放层级时展开聚类
+            showCoverageOnHover: false,     // 禁用悬停显示范围（提升性能）
+            zoomToBoundsOnClick: true,      // 点击聚类时自动缩放到范围
+            disableClusteringAtZoom: 20,    // 在缩放层级≥18时禁用聚类（显示全部标记）
+            
+            // 自定义聚类图标样式
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                let size = 'small';
+                if (count > 100) size = 'large';
+                else if (count > 10) size = 'medium';
+                
+                return L.divIcon({
+                    html: `<div style="background: #4CAF50; color: white; border-radius: 50%; 
+                           width: ${size === 'large' ? '40px' : size === 'medium' ? '30px' : '20px'}; 
+                           height: ${size === 'large' ? '40px' : size === 'medium' ? '30px' : '20px'};
+                           line-height: ${size === 'large' ? '40px' : size === 'medium' ? '30px' : '20px'};
+                           text-align: center; font-weight: bold;">
+                          ${count}</div>`,
+                    className: 'custom-cluster-icon',
+                    iconSize: L.point(40, 40)
+                });
+            }
+        });
+        
+        // 将聚类组添加到地图
+        map.addLayer(markersCluster);
+
+        // 存储所有标记
+        var markers = {};
+        var markerIdCounter = 0;
+
+        // 页面加载时自动加载默认数据
+        window.onload = function() {
+            loadDefaultData();
+            // 确保地图正确调整大小
+            setTimeout(function() {
+                map.invalidateSize();
+            }, 100);
+        };
+
+        // 窗口大小改变时重新调整地图大小
+        window.addEventListener('resize', function() {
+            map.invalidateSize();
+        });
+
+        // 加载默认数据的函数
+        function loadDefaultData() {
+            fetch('yrx_data.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('默认数据文件不存在或无法读取');
+                    }
+                    return response.json();
+                })
+                .then(treeDataArray => {
+                    treeDataArray.forEach(function(treeData) {
+                        addMarkerFromData(treeData);
+                    });
+                    searchTrees();
+                })
+                .catch(error => {
+                    console.log('加载默认数据时出错:', error.message);
+                    // 可以在这里添加用户友好的提示
+                });
+        }
+
+        // 从数据添加标记的辅助函数
+        function addMarkerFromData(treeData) {
+            var marker = L.marker([parseFloat(treeData.lat), parseFloat(treeData.lng)], { icon: greenDotIcon, draggable: false });
+            marker.id = 'marker-' + markerIdCounter;
+            marker.treeData = {
+                id: markerIdCounter++,
+                species: treeData.species || '',
+                notes: treeData.notes || '',
+                lat: treeData.lat,
+                lng: treeData.lng
+            };
+            markers[marker.id] = marker;
+            window[marker.id] = marker;
+            marker.bindPopup(getTreeInfoContent(marker));
+            markersCluster.addLayer(marker);
+        }
+
+        // 保存树数据的函数
+        function saveTreeData(marker) {
+            var species = document.getElementById('species-' + marker.id).value;
+            var notes = document.getElementById('notes-' + marker.id).value;
+            marker.treeData.species = species;
+            marker.treeData.notes = notes;
+            marker.setPopupContent(getTreeInfoContent(marker));
+            marker.closePopup();
+            marker.openPopup();
+        }
+
+        // 删除树标记的函数
+        function deleteTree(marker) {
+            markersCluster.removeLayer(marker);
+            delete markers[marker.id];
+            delete window[marker.id];
+            searchTrees();
+        }
+
+        // 调整位置的函数
+        function adjustPosition(marker) {
+            marker.dragging.enable();
+            marker.on('dragend', function(e) {
+                var newLatLng = marker.getLatLng();
+                marker.treeData.lat = newLatLng.lat.toFixed(6);
+                marker.treeData.lng = newLatLng.lng.toFixed(6);
+                marker.dragging.disable();
+                marker.setPopupContent(getTreeInfoContent(marker));
+                marker.openPopup();
+                searchTrees();
+            });
+            marker.closePopup();
+        }
+
+        // 获取树信息的显示内容
+        function getTreeInfoContent(marker) {
+            return `
+                <div class="tree-info">
+                    <b>树信息</b><br>
+                    编号: ${marker.treeData.id}<br>
+                    树种: ${marker.treeData.species || '未指定'}<br>
+                    备注: ${marker.treeData.notes || '无'}<br>
+                    坐标: ${marker.treeData.lat}, ${marker.treeData.lng}<br>
+                    <button onclick="editTree(window['${marker.id}'])">编辑</button>
+                    <button onclick="adjustPosition(window['${marker.id}'])">调整位置</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+        }
+
+        // 编辑树信息的函数
+        function editTree(marker) {
+            var popupContent = `
+                <div class="tree-form">
+                    <label>树种: <input type="text" id="species-${marker.id}" value="${marker.treeData.species}"></label><br>
+                    <label>备注: <textarea id="notes-${marker.id}">${marker.treeData.notes || ''}</textarea></label><br>
+                    <button onclick="saveTreeData(window['${marker.id}'])">保存</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+            marker.setPopupContent(popupContent);
+            marker.openPopup();
+        }
+
+        // 右键点击添加树标记
+        map.on('contextmenu', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            var marker = L.marker([lat, lng], { icon: greenDotIcon, draggable: false });
+            
+            marker.id = 'marker-' + markerIdCounter;
+            marker.treeData = {
+                id: markerIdCounter++,
+                species: '',
+                notes: '',
+                lat: lat.toFixed(6),
+                lng: lng.toFixed(6)
+            };
+
+            markers[marker.id] = marker;
+            window[marker.id] = marker;
+
+            var popupContent = `
+                <div class="tree-form">
+                    <label>树种: <input type="text" id="species-${marker.id}" value="${marker.treeData.species}"></label><br>
+                    <label>备注: <textarea id="notes-${marker.id}">${marker.treeData.notes || ''}</textarea></label><br>
+                    <button onclick="saveTreeData(window['${marker.id}'])">保存</button>
+                    <button onclick="deleteTree(window['${marker.id}'])">删除</button>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent).openPopup();
+            markersCluster.addLayer(marker);
+            searchTrees();
+        });
+
+        // 导出树数据的函数
+        function exportTreeData() {
+            var treeDataArray = Object.values(markers).map(marker => marker.treeData);
+            var json = JSON.stringify(treeDataArray, null, 2);
+            var blob = new Blob([json], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'tree_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 加载树数据的函数
+        function loadTreeData(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var treeDataArray = JSON.parse(e.target.result);
+                // 清除现有标记
+                markersCluster.clearLayers();
+                markers = {};
+                markerIdCounter = 0;
+                
+                treeDataArray.forEach(function(treeData) {
+                    addMarkerFromData(treeData);
+                });
+                searchTrees();
+            };
+            reader.readAsText(file);
+        }
+
+        // 搜索树木的函数（支持树种和备注）
+        function searchTrees() {
+            var query = document.getElementById('searchInput').value.toLowerCase();
+            var results = Object.values(markers).filter(marker => 
+                (marker.treeData.species.toLowerCase().includes(query) || 
+                 (marker.treeData.notes && marker.treeData.notes.toLowerCase().includes(query)))
+            );
+            var table = '<table><thead><tr><th>编号</th><th>树种</th><th>坐标</th></tr></thead><tbody>';
+            results.forEach(marker => {
+                table += `
+                    <tr onclick="focusTree('${marker.id}')">
+                        <td>${marker.treeData.id}</td>
+                        <td>${marker.treeData.species || '未指定'}</td>
+                        <td>${marker.treeData.lat}, ${marker.treeData.lng}</td>
+                    </tr>
+                `;
+            });
+            table += '</tbody></table>';
+            document.getElementById('searchResults').innerHTML = table;
+        }
+
+        // 定位到树木的函数
+        function focusTree(markerId) {
+            var marker = markers[markerId];
+            if (marker) {
+                map.setView([parseFloat(marker.treeData.lat), parseFloat(marker.treeData.lng)], 19);
+                marker.openPopup();
+            }
+        }
+    </script>
+</body>
+</html>
